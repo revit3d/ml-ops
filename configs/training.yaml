@@ -1,0 +1,42 @@
+data:
+  image_dir: "./data/images"
+  gt_path: "./data/gt.csv"
+output:
+  model_save_dir: "./saved_models/face_keypoint_detector"
+  log_file: "./logs/training.log"
+
+training:
+  device: "auto"
+  epochs: 50
+  fast_train: true
+  seed: 42
+  batch_size: 32
+  num_workers: 0
+  clip_grad_value: 0.05
+
+model:
+  _target_: src.model.UNet
+  in_ch: 3
+  out_ch: 14
+  ch_mul: 32
+
+optimizer:
+  name: "AdamW"
+  lr: 5.0e-4
+  weight_decay: 5.0e-4
+
+scheduler:
+  name: "OneCycleLR"
+  max_lr: 5.0e-3
+
+swa:
+  use_swa: true
+  swa_epochs: 20
+  swa_lr: 1.0e-6
+
+data_processing:
+  img_size: [120, 120]
+  sigma: 3.0  # parameter used for heatmap generation
+  train_ratio: 0.8
+  dataset_mean: [0.5364, 0.4303, 0.3750]
+  dataset_std: [0.2378, 0.2182, 0.2084]
