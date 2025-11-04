@@ -8,7 +8,7 @@ output:
 training:
   device: "auto"
   epochs: 50
-  fast_train: true
+  fast_train: false
   seed: 42
   batch_size: 32
   num_workers: 0
