@@ -2,9 +2,10 @@ import torch
 import numpy as np
 from src.utils import generate_heatmap, heatmaps_to_coords
 
+
 def test_generate_heatmap():
     size = (100, 100)
-    keypoints = np.array([[20.0, 30.0]]) # x=20, y=30
+    keypoints = np.array([[20.0, 30.0]])  # x=20, y=30
     sigma = 3.0
 
     heatmap = generate_heatmap(size, keypoints, sigma)
@@ -15,6 +16,7 @@ def test_generate_heatmap():
     assert max_idx[1] == 30, "Пик по оси Y не в той точке"
     assert max_idx[2] == 20, "Пик по оси X не в той точке"
     assert np.isclose(heatmap.max(), 1.0)
+
 
 def test_heatmaps_to_coords():
     heatmap = torch.zeros(1, 1, 10, 10)

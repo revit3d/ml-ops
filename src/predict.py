@@ -7,12 +7,19 @@ from albumentations.pytorch import ToTensorV2
 from .model import UNet
 from .utils import heatmaps_to_coords
 
-def get_prediction_transforms(img_size: tuple[int, int], mean: list, std: list) -> A.Compose:
-    return A.Compose([
-        A.Resize(*img_size),
-        A.Normalize(mean=mean, std=std),
-        ToTensorV2(),
-    ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
+
+def get_prediction_transforms(
+    img_size: tuple[int, int], mean: list, std: list
+) -> A.Compose:
+    return A.Compose(
+        [
+            A.Resize(*img_size),
+            A.Normalize(mean=mean, std=std),
+            ToTensorV2(),
+        ],
+        keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
+    )
+
 
 def load_model_for_inference(model_path: str, device: torch.device) -> nn.Module:
     try:
@@ -23,16 +30,14 @@ def load_model_for_inference(model_path: str, device: torch.device) -> nn.Module
     except Exception as e:
         raise IOError(f"Error loading model from {model_path}: {e}")
 
+
 def predict_keypoints(
-    model: nn.Module,
-    image: np.ndarray,
-    transforms: A.Compose,
-    device: torch.device
+    model: nn.Module, image: np.ndarray, transforms: A.Compose, device: torch.device
 ) -> list[float]:
     original_size = image.shape[:2]  # (h, w)
 
     transformed = transforms(image=image)
-    input_tensor = transformed['image'].unsqueeze(0).to(device)
+    input_tensor = transformed["image"].unsqueeze(0).to(device)
 
     with torch.no_grad():
         heatmaps = model(input_tensor)
@@ -40,7 +45,7 @@ def predict_keypoints(
     upsampled_heatmaps = nn.functional.interpolate(
         heatmaps,
         size=original_size,
-        mode='bilinear',
+        mode="bilinear",
         align_corners=False,
     )
 

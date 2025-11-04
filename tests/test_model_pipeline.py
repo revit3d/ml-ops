@@ -3,13 +3,14 @@ import numpy as np
 from src.trainer import Trainer
 from src.utils import weighted_mse_loss
 from src.predict import (
-    load_model_for_inference, 
-    predict_keypoints, 
-    get_prediction_transforms
+    load_model_for_inference,
+    predict_keypoints,
+    get_prediction_transforms,
 )
 
+
 def test_model_forward_pass(uninitialized_model, test_config):
-    img_size = test_config['data_processing']['img_size']
+    img_size = test_config["data_processing"]["img_size"]
 
     model = uninitialized_model
     dummy_input = torch.randn(2, 3, *img_size)
@@ -18,11 +19,12 @@ def test_model_forward_pass(uninitialized_model, test_config):
     assert output.shape == (2, 14, *img_size)
     assert output.min() >= 0.0 and output.max() <= 1.0
 
+
 def test_training_step(uninitialized_model, test_config):
-    img_size = test_config['data_processing']['img_size']
+    img_size = test_config["data_processing"]["img_size"]
 
     model = uninitialized_model
-    device = torch.device('cpu')
+    device = torch.device("cpu")
     model.to(device)
 
     weights_before = [p.clone().detach() for p in model.parameters()]
@@ -49,12 +51,13 @@ def test_training_step(uninitialized_model, test_config):
 
     assert weight_changed, "Model weights didn't change after training step"
 
-def test_prediction_pipeline(uninitialized_model, tmpdir, test_config):
-    img_size = test_config['data_processing']['img_size']
-    mean = test_config['data_processing']['dataset_mean']
-    std = test_config['data_processing']['dataset_std']
 
-    device = torch.device('cpu')
+def test_prediction_pipeline(uninitialized_model, tmpdir, test_config):
+    img_size = test_config["data_processing"]["img_size"]
+    mean = test_config["data_processing"]["dataset_mean"]
+    std = test_config["data_processing"]["dataset_std"]
+
+    device = torch.device("cpu")
     model = uninitialized_model.to(device)
 
     model_path = tmpdir.mkdir("test_model")

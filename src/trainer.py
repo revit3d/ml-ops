@@ -5,6 +5,7 @@ from tqdm.auto import tqdm
 
 from .utils import heatmaps_to_coords
 
+
 class Trainer:
     def __init__(
         self,
@@ -12,7 +13,7 @@ class Trainer:
         criterion: nn.Module,
         optimizer: torch.optim.Optimizer,
         device: torch.device,
-        scheduler = None,
+        scheduler=None,
         clip_grad_value: float = 0.05,
         fast_train: bool = False,
     ):
@@ -29,7 +30,9 @@ class Trainer:
         self.model.train()
         total_loss = 0.0
         total_steps = 2 if self.fast_train else len(loader)
-        for i, (inputs, targets) in tqdm(enumerate(loader), desc="Training epoch", total=total_steps):
+        for i, (inputs, targets) in tqdm(
+            enumerate(loader), desc="Training epoch", total=total_steps
+        ):
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
 
@@ -37,7 +40,9 @@ class Trainer:
             outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_grad_value)
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), max_norm=self.clip_grad_value
+            )
             self.optimizer.step()
 
             if self.scheduler:

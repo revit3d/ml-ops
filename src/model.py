@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from transformers import PreTrainedModel, PretrainedConfig
 
+
 class UNetConfig(PretrainedConfig):
     model_type = "unet_face_keypoints"
 
@@ -17,12 +18,14 @@ class UNetConfig(PretrainedConfig):
         self.ch_mul = ch_mul
         super().__init__(**kwargs)
 
+
 class UnetPreTrainedModel(PreTrainedModel):
     config_class = UNetConfig
     base_model_prefix = "unet"
 
     def _init_weights(self, module):
         pass
+
 
 class SEBlock(nn.Module):
     def __init__(self, in_ch, reduction=4):
@@ -40,6 +43,7 @@ class SEBlock(nn.Module):
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1, 1)
         return x * y.expand_as(x)
+
 
 class UNetBlock(nn.Module):
     def __init__(self, in_ch, out_ch, dropout_prob=0.1):
@@ -69,6 +73,7 @@ class UNetBlock(nn.Module):
         x = self.se(x)
         return x + res
 
+
 class UNet(UnetPreTrainedModel):
     def __init__(self, config: UNetConfig):
         super().__init__(config)
@@ -83,33 +88,33 @@ class UNet(UnetPreTrainedModel):
         self.bottleneck = UNetBlock(ch_mul * 4, ch_mul * 8)
 
         self.up3 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-            nn.Conv2d(ch_mul * 8, ch_mul * 4, kernel_size=1)
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(ch_mul * 8, ch_mul * 4, kernel_size=1),
         )
         self.dec3 = UNetBlock(ch_mul * 8, ch_mul * 4)
 
         self.up2 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-            nn.Conv2d(ch_mul * 4, ch_mul * 2, kernel_size=1)
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(ch_mul * 4, ch_mul * 2, kernel_size=1),
         )
         self.dec2 = UNetBlock(ch_mul * 4, ch_mul * 2)
 
         self.up1 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-            nn.Conv2d(ch_mul * 2, ch_mul, kernel_size=1)
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(ch_mul * 2, ch_mul, kernel_size=1),
         )
         self.dec1 = UNetBlock(ch_mul * 2, ch_mul)
 
         self.final = nn.Conv2d(ch_mul, config.out_ch, 1)
         self.sigmoid = nn.Sigmoid()
-        
+
         self.post_init()
 
     def forward(self, x):
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool(e1))
         e3 = self.enc3(self.pool(e2))
-        
+
         b = self.bottleneck(self.pool(e3))
 
         d3 = self.up3(b)
