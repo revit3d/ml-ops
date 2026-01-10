@@ -1,9 +1,16 @@
 data:
   image_dir: "./data/images"
   gt_path: "./data/gt.csv"
+
+processed_data:
+  dir: "./data/processed"
+  train_path: "./data/processed/train.csv"
+  val_path: "./data/processed/val.csv"
+
 output:
   model_save_dir: "./saved_models/face_keypoint_detector"
   log_file: "./logs/training.log"
+  metrics_file: "./metrics.json"
 
 training:
   device: "auto"
@@ -36,7 +43,7 @@ swa:
 
 data_processing:
   img_size: [120, 120]
-  sigma: 3.0  # parameter used for heatmap generation
+  sigma: 3.0
   train_ratio: 0.8
   dataset_mean: [0.5364, 0.4303, 0.3750]
   dataset_std: [0.2378, 0.2182, 0.2084]

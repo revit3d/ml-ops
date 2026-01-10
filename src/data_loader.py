@@ -12,11 +12,11 @@ from .utils import generate_heatmap, remap_keypoints
 
 
 class FaceImageDataset(Dataset):
-    def __init__(self, image_dir, transform: A.Compose, img_size, sigma, gt=None):
+    def __init__(self, image_dir, transform: A.Compose, img_size, sigma, csv_file=None):
         self.image_dir = image_dir
-        self.image_files = os.listdir(image_dir)
+        self.targets = pd.read_csv(csv_file, index_col="filename")
+        self.image_files = self.targets.index.tolist()
         self.transform = transform
-        self.targets = pd.read_csv(gt, index_col="filename") if gt else None
         self.img_size = img_size
         self.sigma = sigma
 
@@ -96,22 +96,21 @@ def prepare_dataloaders(config: dict) -> tuple[DataLoader, DataLoader]:
         keypoint_params=A.KeypointParams(format="xy", remove_invisible=False),
     )
 
-    full_dataset = FaceImageDataset(
+    train_dataset = FaceImageDataset(
         image_dir=config["data"]["image_dir"],
-        gt=config["data"]["gt_path"],
+        csv_file=config["processed_data"]["train_path"],
         img_size=img_size,
         transform=train_transforms,
         sigma=config["data_processing"]["sigma"],
     )
 
-    generator = torch.Generator().manual_seed(config["training"]["seed"])
-    train_size = int(config["data_processing"]["train_ratio"] * len(full_dataset))
-    val_size = len(full_dataset) - train_size
-
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        full_dataset, [train_size, val_size], generator=generator
+    val_dataset = FaceImageDataset(
+        image_dir=config["data"]["image_dir"],
+        csv_file=config["processed_data"]["val_path"],
+        img_size=img_size,
+        transform=val_transforms,
+        sigma=config["data_processing"]["sigma"],
     )
-    val_dataset.dataset.transform = val_transforms
 
     train_loader = DataLoader(
         train_dataset,
