@@ -213,5 +213,4 @@ saved_models
 logs
 
 # DVC
-dvc.lock
 metrics.json

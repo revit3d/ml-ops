@@ -1,0 +1,89 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python -m src.prepare --config configs/training.yaml
+    deps:
+    - path: configs/training.yaml
+      hash: md5
+      md5: f838b12201bd29320e6764e16f1cc318
+      size: 845
+    - path: data/gt.csv
+      hash: md5
+      md5: 5280859618e96d400983154263a7ad76
+      size: 623220
+    - path: src/prepare.py
+      hash: md5
+      md5: 3b0cb88b3f569068154856ef925e2bb7
+      size: 1090
+    outs:
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 95a6d98fbbd32149b34504e755d873f1
+      size: 498120
+    - path: data/processed/val.csv
+      hash: md5
+      md5: 21fe05eaf136f4d00461791dae4e03ac
+      size: 125203
+  train:
+    cmd: python -m src.train --config configs/training.yaml
+    deps:
+    - path: configs/training.yaml
+      hash: md5
+      md5: f838b12201bd29320e6764e16f1cc318
+      size: 845
+    - path: data/images
+      hash: md5
+      md5: 37269b6462a21f2a47434e5825f2a161.dir
+      size: 133070199
+      nfiles: 6000
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 95a6d98fbbd32149b34504e755d873f1
+      size: 498120
+    - path: data/processed/val.csv
+      hash: md5
+      md5: 21fe05eaf136f4d00461791dae4e03ac
+      size: 125203
+    - path: src/model.py
+      hash: md5
+      md5: c168aafa4c417fc78d6034fadc8943ae
+      size: 3731
+    - path: src/train.py
+      hash: md5
+      md5: 1be6013ddb2f5e6a2c5b672c6b349f24
+      size: 4886
+    - path: src/trainer.py
+      hash: md5
+      md5: 3b056702f392ffff98a56734d46de4cd
+      size: 2351
+    outs:
+    - path: saved_models/face_keypoint_detector
+      hash: md5
+      md5: 59aa1f3023a10e58388e548462691181.dir
+      size: 7780159
+      nfiles: 2
+  evaluate:
+    cmd: python -m src.evaluate --config configs/training.yaml
+    deps:
+    - path: configs/training.yaml
+      hash: md5
+      md5: f838b12201bd29320e6764e16f1cc318
+      size: 845
+    - path: data/processed/val.csv
+      hash: md5
+      md5: 21fe05eaf136f4d00461791dae4e03ac
+      size: 125203
+    - path: saved_models/face_keypoint_detector
+      hash: md5
+      md5: 59aa1f3023a10e58388e548462691181.dir
+      size: 7780159
+      nfiles: 2
+    - path: src/evaluate.py
+      hash: md5
+      md5: 5e05d54358afc8fbdad88fcdb4d93294
+      size: 2302
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: d469576e4d64c5363303b3990b4981b3
+      size: 36
