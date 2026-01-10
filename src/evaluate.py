@@ -11,6 +11,7 @@ from .model import UNet
 from .data_loader import FaceImageDataset
 from .utils import get_device, heatmaps_to_coords
 
+
 def evaluate(config_path):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
@@ -36,7 +37,7 @@ def evaluate(config_path):
         transform=val_transforms,
         sigma=config["data_processing"]["sigma"],
     )
-    
+
     val_loader = DataLoader(
         val_dataset,
         batch_size=config["training"]["batch_size"],
@@ -53,10 +54,10 @@ def evaluate(config_path):
         for inputs, targets in val_loader:
             inputs = inputs.to(device)
             outputs = model(inputs)
-            
+
             target_coords = heatmaps_to_coords(targets.to(device))
             output_coords = heatmaps_to_coords(outputs)
-            
+
             mse = nn.functional.mse_loss(target_coords, output_coords)
             total_mse += mse.item()
 
@@ -66,6 +67,7 @@ def evaluate(config_path):
     metrics = {"val_mse": avg_mse}
     with open(config["output"]["metrics_file"], "w") as f:
         json.dump(metrics, f, indent=4)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
