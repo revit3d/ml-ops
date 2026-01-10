@@ -1,0 +1,26 @@
+# Git & DVC
+.git
+.dvc
+.dvcignore
+dvc.lock
+dvc.yaml
+
+# Python cache
+__pycache__
+*.pyc
+
+# Environments
+venv/
+env/
+
+# Data
+data/
+outputs/
+logs/
+mlruns/
+
+# IDE
+.vscode
+
+# Temp files
+metrics.json
