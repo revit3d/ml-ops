@@ -5,9 +5,11 @@ import random
 import numpy as np
 import os
 import torch
+import mlflow
+import mlflow.pytorch
 from torch.optim.swa_utils import AveragedModel, update_bn
 
-from .utils import setup_logging, get_device, weighted_mse_loss
+from .utils import setup_logging, get_device, weighted_mse_loss, flatten_dict, get_dvc_hash
 from .data_loader import prepare_dataloaders
 from .model import UNet, UNetConfig
 from .trainer import Trainer
@@ -23,121 +25,120 @@ def main(config_path: str, verbose: bool = False):
     if verbose:
         logger.setLevel(logging.DEBUG)
 
-    logger.info("--- Starting Training ---")
-    logger.info(f"Loaded configuration from {config_path}")
+    mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
+    mlflow.set_experiment(config["mlflow"]["experiment_name"])
 
-    seed = config["training"]["seed"]
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    mlflow.pytorch.autolog(log_models=False)
 
-    if config["training"]["fast_train"]:
-        logger.warning("!!! Running in fast_train mode !!!")
-        config["training"]["epochs"] = 1
-        config["swa"]["swa_epochs"] = 1
-        config["training"]["batch_size"] = 4
-        config["training"]["num_workers"] = 0
-        config["training"]["device"] = "cpu"
+    with mlflow.start_run(run_name=config["mlflow"].get("run_name")) as run:
+        logger.info(f"MLflow Run ID: {run.info.run_id}")
 
-    device = get_device(config["training"]["device"])
-    logger.info(f"Using device: {device}")
+        mlflow.log_params(flatten_dict(config))
 
-    train_loader, val_loader = prepare_dataloaders(config)
-    logger.info(
-        f"Train loader: {len(train_loader)} batches, Val loader: {len(val_loader)} batches"
-    )
+        data_hash = get_dvc_hash("data/gt.csv") 
+        mlflow.set_tag("dvc_gt_hash", data_hash)
 
-    model_config = UNetConfig(**config["model"])
-    model = UNet(model_config).to(device)
-    logger.info(
-        f"Model created with {sum(p.numel() for p in model.parameters())/1e6:.2f}M parameters"
-    )
+        if os.path.exists("dvc.yaml"):
+            mlflow.log_artifact("dvc.yaml")
+        if os.path.exists("dvc.lock"):
+            mlflow.log_artifact("dvc.lock")
 
-    if config["optimizer"]["name"] == "AdamW":
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=config["optimizer"]["lr"],
-            weight_decay=config["optimizer"]["weight_decay"],
-        )
-    elif config["optimizer"]["name"] == "Adam":
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=config["optimizer"]["lr"],
-            weight_decay=config["optimizer"]["weight_decay"],
-        )
-    else:
-        raise ValueError(f"Unknown optimizer: {config['optimizer']['name']}")
+        seed = config["training"]["seed"]
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
-    if config["scheduler"]["name"] == "OneCycleLR":
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer,
-            max_lr=config["scheduler"]["max_lr"],
-            steps_per_epoch=len(train_loader),
-            epochs=config["training"]["epochs"],
-        )
-    else:
-        raise ValueError(f"Unknwon scheduler: {config['scheduler']['name']}")
+        if config["training"]["fast_train"]:
+            logger.warning("!!! running in fast_train mode !!!")
+            config["training"]["epochs"] = 1
+            config["swa"]["swa_epochs"] = 1
+            config["training"]["batch_size"] = 4
+            config["training"]["device"] = "cpu"
 
-    trainer = Trainer(
-        model=model,
-        criterion=weighted_mse_loss,
-        optimizer=optimizer,
-        device=device,
-        scheduler=scheduler,
-        clip_grad_value=config["training"]["clip_grad_value"],
-        fast_train=config["training"]["fast_train"],
-    )
+        device = get_device(config["training"]["device"])
+        
+        train_loader, val_loader = prepare_dataloaders(config)
+        
+        model_config = UNetConfig(**config["model"])
+        model = UNet(model_config).to(device)
+        
+        if config["optimizer"]["name"] == "AdamW":
+            optimizer = torch.optim.AdamW(
+                model.parameters(),
+                lr=config["optimizer"]["lr"],
+                weight_decay=config["optimizer"]["weight_decay"],
+            )
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=config["optimizer"]["lr"])
 
-    for epoch in range(config["training"]["epochs"]):
-        logger.info(f"--- Epoch {epoch + 1}/{config['training']['epochs']} ---")
-        trainer.train_epoch(train_loader)
-        trainer.validate(val_loader)
+        if config["scheduler"]["name"] == "OneCycleLR":
+            scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                optimizer,
+                max_lr=config["scheduler"]["max_lr"],
+                steps_per_epoch=len(train_loader),
+                epochs=config["training"]["epochs"],
+            )
+        else:
+            scheduler = None
 
-    if config["swa"]["use_swa"]:
-        logger.info("--- Starting SWA Phase ---")
-        swa_model = AveragedModel(model)
-        swa_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=len(train_loader) * config["swa"]["swa_epochs"]
+        trainer = Trainer(
+            model=model,
+            criterion=weighted_mse_loss,
+            optimizer=optimizer,
+            device=device,
+            scheduler=scheduler,
+            clip_grad_value=config["training"]["clip_grad_value"],
+            fast_train=config["training"]["fast_train"],
         )
 
-        trainer.scheduler = swa_scheduler
+        extra_epochs = config["training"]["epochs"]
 
-        for epoch in range(config["swa"]["swa_epochs"]):
-            logger.info(f"--- SWA Epoch {epoch + 1}/{config['swa']['swa_epochs']} ---")
-            trainer.train_epoch(train_loader)
-            swa_model.update_parameters(model)
+        for epoch in range(extra_epochs):
+            logger.info(f"--- Epoch {epoch + 1}/{extra_epochs} ---")
+            trainer.train_epoch(train_loader, epoch)
+            trainer.validate(val_loader, epoch)
 
-        logger.info("Updating SWA batch norm statistics...")
-        update_bn(train_loader, swa_model, device=device)
-        final_model = swa_model.module
-    else:
-        final_model = model
+        if config["swa"]["use_swa"]:
+            logger.info("--- Starting SWA Phase ---")
+            swa_model = AveragedModel(model)
+            swa_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=len(train_loader) * config["swa"]["swa_epochs"]
+            )
+            trainer.scheduler = swa_scheduler
 
-    logger.info("--- Final Validation on the resulting model ---")
-    trainer.model = final_model.to(device)
-    final_mse = trainer.validate(val_loader)
-    logger.info(f"Final Validation MSE: {final_mse:.4f}")
+            for i in range(config["swa"]["swa_epochs"]):
+                current_swa_epoch = extra_epochs + i
+                logger.info(f"--- SWA Epoch {i + 1}/{config['swa']['swa_epochs']} ---")
+                trainer.train_epoch(train_loader, current_swa_epoch)
+                swa_model.update_parameters(model)
+            
+            update_bn(train_loader, swa_model, device=device)
+            final_model = swa_model.module
+        else:
+            final_model = model
 
-    save_path = config["output"]["model_save_dir"]
-    os.makedirs(save_path, exist_ok=True)
-    final_model.save_pretrained(save_path)
-    logger.info(f"Model saved to {save_path} in Hugging Face format.")
-    logger.info("--- Training Finished ---")
+        logger.info("--- Final Validation ---")
+        trainer.model = final_model.to(device)
+        final_mse = trainer.validate(val_loader, epoch=extra_epochs + config["swa"]["swa_epochs"])
 
+        mlflow.log_metric("final_mse", final_mse)
+
+        save_path = config["output"]["model_save_dir"]
+        os.makedirs(save_path, exist_ok=True)
+        final_model.save_pretrained(save_path)
+        
+        logger.info(f"Model saved to {save_path}")
+
+        mlflow.log_artifacts(save_path, artifact_path="model")
+
+        mlflow.log_artifact(config["output"]["log_file"])
+
+        logger.info("--- Training Finished ---")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Train a face keypoint detection model."
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        required=True,
-        help="Path to the training configuration file (e.g., configs/train_config.yaml)",
-    )
-    parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose logging."
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, required=True)
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     main(args.config, args.verbose)

@@ -12,6 +12,11 @@ output:
   log_file: "./logs/training.log"
   metrics_file: "./metrics.json"
 
+mlflow:
+  experiment_name: "Face_Keypoints_Detector"
+  tracking_uri: "./mlruns"
+  run_name: "unet_baseline"
+
 training:
   device: "auto"
   epochs: 50

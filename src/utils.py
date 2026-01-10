@@ -3,6 +3,8 @@ import torch
 import numpy as np
 import sys
 
+from collections.abc import MutableMapping
+
 
 def get_device(device_config: str) -> torch.device:
     if device_config == "auto":
@@ -20,6 +22,28 @@ def setup_logging(log_file: str):
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[logging.FileHandler(log_file), logging.StreamHandler(sys.stdout)],
     )
+
+
+def flatten_dict(d, parent_key='', sep='.'):
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, MutableMapping):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def get_dvc_hash(filepath):
+    try:
+        import yaml
+        dvc_file = filepath + ".dvc"
+        with open(dvc_file, 'r') as f:
+            data = yaml.safe_load(f)
+        return data['outs'][0]['md5']
+    except Exception:
+        return "unknown"
 
 
 def generate_heatmap(size, keypoints, sigma):
