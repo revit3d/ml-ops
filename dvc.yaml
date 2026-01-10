@@ -1,0 +1,34 @@
+stages:
+  prepare:
+    cmd: python -m src.prepare --config configs/training.yaml
+    deps:
+      - src/prepare.py
+      - data/gt.csv
+      - configs/training.yaml
+    outs:
+      - data/processed/train.csv
+      - data/processed/val.csv
+
+  train:
+    cmd: python -m src.train --config configs/training.yaml
+    deps:
+      - src/train.py
+      - src/model.py
+      - src/trainer.py
+      - data/images
+      - data/processed/train.csv
+      - data/processed/val.csv
+      - configs/training.yaml
+    outs:
+      - saved_models/face_keypoint_detector
+
+  evaluate:
+    cmd: python -m src.evaluate --config configs/training.yaml
+    deps:
+      - src/evaluate.py
+      - saved_models/face_keypoint_detector
+      - data/processed/val.csv
+      - configs/training.yaml
+    metrics:
+      - metrics.json:
+          cache: false

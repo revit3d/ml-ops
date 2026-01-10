@@ -211,3 +211,7 @@ saved_models
 
 # Logging
 logs
+
+# DVC
+dvc.lock
+metrics.json
