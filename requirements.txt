@@ -8,3 +8,4 @@ tqdm
 Pillow
 transformers
 mlflow
+torchserve

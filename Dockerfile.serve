@@ -1,0 +1,33 @@
+FROM python:3.13-slim AS archiver
+
+WORKDIR /build
+
+RUN pip install torch-model-archiver
+
+COPY src/ src/
+COPY saved_models/face_kpts.pt saved_models/face_kpts.pt
+
+RUN mkdir -p model-store
+
+RUN torch-model-archiver --model-name face_kpts \
+    --version 1.0 \
+    --model-file src/model.py \
+    --serialized-file saved_models/face_kpts.pt \
+    --handler src/ts_handler.py \
+    --extra-files "src/utils.py,src/model.py" \
+    --export-path model-store
+
+FROM pytorch/torchserve:latest-cpu
+
+USER root
+RUN pip install --no-cache-dir albumentations opencv-python-headless transformers
+USER model-server
+
+COPY --from=archiver /build/model-store /home/model-server/model-store
+COPY config.properties /home/model-server/config.properties
+
+CMD ["torchserve", \
+     "--start", \
+     "--models", "face_kpts=face_kpts.mar", \
+     "--ts-config", "/home/model-server/config.properties", \
+     "--ncs"]
