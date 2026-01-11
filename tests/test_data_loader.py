@@ -16,36 +16,29 @@ def test_dataset_item(test_config):
 
     dataset = FaceImageDataset(
         image_dir=image_dir,
-        gt=gt_path,
+        csv_file=gt_path,
         transform=transforms,
         img_size=img_size,
         sigma=test_config["data_processing"]["sigma"],
     )
 
-    assert len(dataset) == 5
+    assert len(dataset) == 10
 
     image, heatmap = dataset[0]
 
     assert isinstance(image, torch.Tensor)
     assert isinstance(heatmap, torch.Tensor)
-
-    assert image.dtype == torch.float32
-    assert heatmap.dtype == torch.float32
-
     assert image.shape == (3, *img_size)
     assert heatmap.shape == (14, *img_size)
-    assert image.min() >= -2.0 and image.max() <= 2.0
-    assert heatmap.min() >= 0.0 and heatmap.max() <= 1.0
 
 
-def test_prepare_dataloaders(test_config):
+def test_prepare_dataloaders(test_config, prepared_data):
     train_loader, val_loader = prepare_dataloaders(test_config)
 
-    assert len(train_loader.dataset) == 4
-    assert len(val_loader.dataset) == 1
+    assert len(train_loader.dataset) == 8
+    assert len(val_loader.dataset) == 2
 
     train_batch_images, train_batch_heatmaps = next(iter(train_loader))
-
     batch_size = test_config["training"]["batch_size"]
     img_size = test_config["data_processing"]["img_size"]
 

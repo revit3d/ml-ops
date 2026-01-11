@@ -9,7 +9,13 @@ import mlflow
 import mlflow.pytorch
 from torch.optim.swa_utils import AveragedModel, update_bn
 
-from .utils import setup_logging, get_device, weighted_mse_loss, flatten_dict, get_dvc_hash
+from .utils import (
+    setup_logging,
+    get_device,
+    weighted_mse_loss,
+    flatten_dict,
+    get_dvc_hash,
+)
 from .data_loader import prepare_dataloaders
 from .model import UNet, UNetConfig
 from .trainer import Trainer
@@ -35,7 +41,7 @@ def main(config_path: str, verbose: bool = False):
 
         mlflow.log_params(flatten_dict(config))
 
-        data_hash = get_dvc_hash("data/gt.csv") 
+        data_hash = get_dvc_hash("data/gt.csv")
         mlflow.set_tag("dvc_gt_hash", data_hash)
 
         if os.path.exists("dvc.yaml"):
@@ -57,12 +63,12 @@ def main(config_path: str, verbose: bool = False):
             config["training"]["device"] = "cpu"
 
         device = get_device(config["training"]["device"])
-        
+
         train_loader, val_loader = prepare_dataloaders(config)
-        
+
         model_config = UNetConfig(**config["model"])
         model = UNet(model_config).to(device)
-        
+
         if config["optimizer"]["name"] == "AdamW":
             optimizer = torch.optim.AdamW(
                 model.parameters(),
@@ -70,7 +76,9 @@ def main(config_path: str, verbose: bool = False):
                 weight_decay=config["optimizer"]["weight_decay"],
             )
         else:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=config["optimizer"]["lr"])
+            optimizer = torch.optim.AdamW(
+                model.parameters(), lr=config["optimizer"]["lr"]
+            )
 
         if config["scheduler"]["name"] == "OneCycleLR":
             scheduler = torch.optim.lr_scheduler.OneCycleLR(
@@ -112,7 +120,7 @@ def main(config_path: str, verbose: bool = False):
                 logger.info(f"--- SWA Epoch {i + 1}/{config['swa']['swa_epochs']} ---")
                 trainer.train_epoch(train_loader, current_swa_epoch)
                 swa_model.update_parameters(model)
-            
+
             update_bn(train_loader, swa_model, device=device)
             final_model = swa_model.module
         else:
@@ -120,14 +128,16 @@ def main(config_path: str, verbose: bool = False):
 
         logger.info("--- Final Validation ---")
         trainer.model = final_model.to(device)
-        final_mse = trainer.validate(val_loader, epoch=extra_epochs + config["swa"]["swa_epochs"])
+        final_mse = trainer.validate(
+            val_loader, epoch=extra_epochs + config["swa"]["swa_epochs"]
+        )
 
         mlflow.log_metric("final_mse", final_mse)
 
         save_path = config["output"]["model_save_dir"]
         os.makedirs(save_path, exist_ok=True)
         final_model.save_pretrained(save_path)
-        
+
         logger.info(f"Model saved to {save_path}")
 
         mlflow.log_artifacts(save_path, artifact_path="model")
@@ -135,6 +145,7 @@ def main(config_path: str, verbose: bool = False):
         mlflow.log_artifact(config["output"]["log_file"])
 
         logger.info("--- Training Finished ---")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -34,12 +34,14 @@ def test_training_step(uninitialized_model, test_config):
 
     dummy_inputs = torch.randn(2, 3, *img_size, device=device)
     dummy_targets = torch.rand(2, 14, *img_size, device=device)
+    dummy_loader = [(dummy_inputs, dummy_targets)]
 
-    trainer.optimizer.zero_grad()
-    outputs = trainer.model(dummy_inputs)
-    loss = trainer.criterion(outputs, dummy_targets)
-    loss.backward()
-    trainer.optimizer.step()
+    from unittest.mock import patch
+
+    with patch("src.trainer.mlflow") as mock_mlflow:
+        trainer.train_epoch(dummy_loader, epoch=0)
+
+        assert mock_mlflow.log_metric.called
 
     weights_after = list(model.parameters())
 

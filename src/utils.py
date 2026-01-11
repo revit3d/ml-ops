@@ -24,7 +24,7 @@ def setup_logging(log_file: str):
     )
 
 
-def flatten_dict(d, parent_key='', sep='.'):
+def flatten_dict(d, parent_key="", sep="."):
     items = []
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
@@ -38,10 +38,11 @@ def flatten_dict(d, parent_key='', sep='.'):
 def get_dvc_hash(filepath):
     try:
         import yaml
+
         dvc_file = filepath + ".dvc"
-        with open(dvc_file, 'r') as f:
+        with open(dvc_file, "r") as f:
             data = yaml.safe_load(f)
-        return data['outs'][0]['md5']
+        return data["outs"][0]["md5"]
     except Exception:
         return "unknown"
 
