@@ -90,3 +90,47 @@ mlflow ui
 ```bash
 docker build -t ml-app:v1 .
 ```
+
+### Запуск инференса через Docker-контейнер
+Для получения предсказаний модели запустите команду
+
+```bash
+docker run --rm \
+  -v $(pwd)/data/images:/data_in \  # Поменяйте на путь, где хранятся исходные данные (папка с файлами-изображениями)
+  -v $(pwd):/data_out \  # Поменяйте на путь, в котором будет сохранен .csv-файл с предсказаниями
+  ml-app:v1 \
+  --input_path /data_in \
+  --output_path /data_out/preds.csv
+```
+
+В результате в папке, примонтированной по пути `/data_out` (см. команду), будет сгенерирован файл `preds.csv`, в котором в каждой строке будет указано название входного файла и 14 предсказанных координат.
+
+## TorchServe
+
+Модель доступна как REST API сервис.
+
+### Подготовка
+Экспортируйте веса модели в формат `state_dict`:
+```bash
+python scripts/export_to_ts.py
+```
+
+### Запуск сервиса
+```bash
+docker build -t mymodel-serve:v1 -f Dockerfile.serve .
+docker run -d -p 8080:8080 mymodel-serve:v1
+```
+
+### API
+Endpoint: POST http://localhost:8080/predictions/face_kpts
+Пример запроса:
+```bash
+curl -X POST http://localhost:8080/predictions/face_kpts -T path/to/image.jpg
+```
+
+Формат ответа:
+```json
+{
+    "keypoints": [x1, y1, x2, y2, ..., x14, y14]
+}
+```
